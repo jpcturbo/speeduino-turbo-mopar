@@ -5802,3 +5802,213 @@ void triggerSetEndTeeth_SuzukiK6A(void)
 }
 /** @} */
 
+/** Turbo-Mopar 80s and 90s 2.2/2.5L Turbo Chrysler - MPSeeduino for LM/SMEC 
+* MPSpeeduino - Arduino and factory ECU hybrid. 
+*
+* @defgroup Turbo_Mopar
+* @{
+*/
+
+//TODO JPC add support for new mode (configPage4.useResync == 1) )
+
+volatile bool inSpecialTooth = 0;  // used to identify we are in the "window" tooth on the Turbo Mopar pattern.
+
+void triggerSetup_Turbo_Mopar(void)
+{
+  BIT_CLEAR(decoderState, BIT_DECODER_2ND_DERIV);
+  BIT_SET(decoderState, BIT_DECODER_IS_SEQUENTIAL);
+  BIT_CLEAR(decoderState, BIT_DECODER_HAS_FIXED_CRANKING);
+  BIT_SET(decoderState, BIT_DECODER_TOOTH_ANG_CORRECT);
+  BIT_SET(decoderState, BIT_DECODER_HAS_SECONDARY);
+
+  triggerToothAngle = 180; //The number of degrees that passes from tooth to tooth (primary)
+  toothCurrentCount = 11;  //uninitialized state for debugging. 
+
+  //Note that these angles are for every rising and falling edge
+  //10 edges if we track the window. 
+  toothAngles[0] = 0;   //Falling edge of tooth #1 - Cyl #1 TDC
+  toothAngles[1] = 97;  //Rising edge of tooth #2
+  toothAngles[2] = 180; //Falling edge of tooth #2 - Cyl #3 TDC
+  toothAngles[3] = 277; //Rising edge of tooth #3 
+  toothAngles[4] = 360; //Falling edge of tooth #3 - Cyl #4 TDC
+  toothAngles[5] = 457; //Rising edge of tooth #4 (Window)
+  // toothAngles[6] = 489; //Falling edge, window start
+  // toothAngles[7] = 508; //Rising edge, window end
+  toothAngles[6] = 540; //Falling edge of tooth #4 (Window) - Cyl #2 TDC
+  toothAngles[7] = 637; //Rising edge of tooth #1
+
+  triggerActualTeeth = 8;  //4 real teeth, both edges. Although with the window there are 5. 3 large and 2 small.
+
+  triggerFilterTime = MICROS_PER_MIN / MAX_RPM / 20; //2.777uS Both edges of a tooth with window's "tooth". so 9-10 cam degrees. 
+  triggerSecFilterTime = triggerFilterTime; //Same as above
+  MAX_STALL_TIME = (MICROS_PER_DEG_1_RPM/30U) * (720 / 4); //Minimum 30rpm with 4 teeth.
+}
+
+//CHANGE. On Pri (REF) rising in the window tooth will Sec (SYNC) also be high.
+void triggerPri_Turbo_Mopar(void){
+  curTime = micros();
+  curGap = curTime - toothLastToothTime;
+  if (curGap >= triggerFilterTime)
+  {
+    BIT_SET(decoderState, BIT_DECODER_VALID_TRIGGER); //Flag this pulse as being a valid trigger (ie that it passed filters). Used for Loggers.
+
+    //If not window then count the tooth. Don't count the fall and rise of the tooth's window as a current tooth. 
+    if (inSpecialTooth == false && READ_PRI_TRIGGER() == true && READ_SEC_TRIGGER() == true)
+    {
+      if (currentStatus.hasSync == true && toothCurrentCount != 6) {
+        //Sync error 
+        currentStatus.hasSync = false;
+        currentStatus.syncLossCounter++;
+      }      
+      toothCurrentCount = 6;  //6 is half way done by here.
+      currentStatus.hasSync = true;
+      revolutionOne = true;  //Cyl #2 and #1 TDC next
+      currentStatus.startRevolutions++;  //TODO JPC Is this only supposed to be counted at tooth 1, and then 4 instead??
+      inSpecialTooth = true;  //Don't count this edge and skip the next falling edge. 
+    } 
+    else if (inSpecialTooth == true)
+    {
+      inSpecialTooth = false; // falling edge of window. Window is done. So count the next edge as a tooth.
+    } 
+    else 
+    {
+      //If hasSync, check if this tooth is really short, less than half the last tooth. If so, then we didn't catch the window, probably because we lost SYNC. 
+      if (currentStatus.hasSync == true && (curGap < ((toothLastToothTime - toothLastMinusOneToothTime) >> 1))) {
+        //Sync error 
+        currentStatus.hasSync = false;
+        currentStatus.syncLossCounter++;
+      } else {
+        toothLastMinusOneToothTime = toothLastToothTime;
+        toothLastToothTime = curTime;
+
+        toothCurrentCount++;
+
+        if (toothCurrentCount > triggerActualTeeth)
+        {
+          toothCurrentCount = 1; //Reset the counter
+        }
+        if (toothCurrentCount == 1) 
+        {
+          toothOneMinusOneTime = toothOneTime;  //This is what is used to calculate RPM when not cranking.
+          toothOneTime = curTime;
+        }
+      }
+    }
+
+    if (currentStatus.hasSync == true)
+    {
+      if ( (toothCurrentCount == 1) || (toothCurrentCount == 3) || (toothCurrentCount == 5) || (toothCurrentCount == 7)  )
+      {
+        triggerToothAngle = 83;      
+      } 
+      else 
+      {
+        triggerToothAngle = 97;
+      }
+    }     
+  } 
+}
+
+//RISING. Look at rising edge. Pri will always be high except for in the sync window tooth, then only it will be low. 
+void triggerSec_Turbo_Mopar(void)
+{
+  curTime2 = micros();
+  curGap2 = curTime2 - toothLastSecToothTime;
+  if ( (curGap2 >= triggerSecFilterTime) )//|| (currentStatus.startRevolutions == 0) )
+  {
+    toothLastSecToothTime = curTime2;
+    BIT_SET(decoderState, BIT_DECODER_VALID_TRIGGER); //Flag this pulse as being a valid trigger (ie that it passed filters). Used for Loggers
+
+    if( (currentStatus.hasSync == false) )
+    {
+      if(READ_PRI_TRIGGER() == false)
+      {
+       currentStatus.hasSync = true;  //Pri should have passed tooth 3 by now. 
+       toothCurrentCount = 2;  //2 is ~1/3 of the way in.
+       revolutionOne = false; //Cyl #3 and #4 TDC next
+       currentStatus.startRevolutions++;
+      }
+    }
+  } 
+}
+
+uint16_t getRPM_Turbo_Mopar(void)
+{
+  uint16_t tempRPM = 0;
+  if(currentStatus.hasSync == true)
+  {
+    //tempRPM = toothCurrentCount * 100;  //Debugging...
+    tempRPM = stdGetRPM(CAM_SPEED);
+
+    // noInterrupts();
+    // SetRevolutionTime((toothOneTime - toothOneMinusOneTime) >> 1); //The time in uS that one revolution would take at current speed (The time tooth 1 was last seen, minus the time it was seen prior to that)
+    // interrupts();    
+    // tempRPM = RpmFromRevolutionTimeUs(revolutionTime); //Calc RPM based on last full revolution time (Faster as /)
+
+    //TODO JPC handle sub two revolution cranking rpm calc?  This below is from the 4G63 decoder.
+    // if( (currentStatus.RPM < currentStatus.crankRPM)  )
+    // {
+    //   int tempToothAngle;
+    //   unsigned long toothTime;
+    //   if( (toothLastToothTime == 0) || (toothLastMinusOneToothTime == 0) ) { tempRPM = 0; }
+    //   else
+    //   {
+    //     noInterrupts();
+    //     tempToothAngle = triggerToothAngle;
+    //     toothTime = (toothLastToothTime - toothLastMinusOneToothTime); //Note that trigger tooth angle changes between 70 and 110 depending on the last tooth that was seen (or 70/50 for 6 cylinders)
+    //     interrupts();
+    //     toothTime = toothTime * 36;
+    //     tempRPM = ((unsigned long)tempToothAngle * (MICROS_PER_MIN/10U)) / toothTime;
+    //     SetRevolutionTime((10UL * toothTime) / tempToothAngle);
+    //     // MAX_STALL_TIME = 366667UL; // 50RPM
+    //   }
+    // }
+    // else
+    // {
+    //   tempRPM = stdGetRPM(CAM_SPEED);
+    //   //EXPERIMENTAL! Add/subtract RPM based on the last rpmDOT calc
+    //   //tempRPM += (micros() - toothOneTime) * currentStatus.rpmDOT
+    //   // MAX_STALL_TIME = revolutionTime << 1; //Set the stall time to be twice the current RPM. This is a safe figure as there should be no single revolution where this changes more than this
+    //   // if(MAX_STALL_TIME < 366667UL) { MAX_STALL_TIME = 366667UL; } //Check for 50rpm minimum
+    // }
+  }
+
+  return tempRPM;
+}
+
+int getCrankAngle_Turbo_Mopar(void)
+{
+  int crankAngle = 0;
+    if(currentStatus.hasSync == true)
+    {
+      //This is the current angle ATDC the engine is at. This is the last known position based on what tooth was last 'seen'. It is only accurate to the resolution of the trigger wheel (Eg 36-1 is 10 degrees)
+      unsigned long tempToothLastToothTime;
+      int tempToothCurrentCount;
+      //Grab some variables that are used in the trigger code and assign them to temp variables.
+      noInterrupts();
+      tempToothCurrentCount = toothCurrentCount;
+      tempToothLastToothTime = toothLastToothTime;
+      lastCrankAngleCalc = micros(); //micros() is no longer interrupt safe
+      interrupts();
+
+      crankAngle = toothAngles[(tempToothCurrentCount - 1)] + configPage4.triggerAngle; //Perform a lookup of the fixed toothAngles array to find what the angle of the last tooth passed was.
+
+      //Estimate the number of degrees travelled since the last tooth}
+      elapsedTime = (lastCrankAngleCalc - tempToothLastToothTime);
+      crankAngle += timeToAngleIntervalTooth(elapsedTime);
+
+      if (crankAngle >= 720) { crankAngle -= 720; }
+      if (crankAngle < 0) { crankAngle += 360; }
+    }
+    return crankAngle;
+}
+
+void triggerSetEndTeeth_Turbo_Mopar(void)
+{
+  ignition1EndTooth = 1;
+  ignition2EndTooth = 3;
+  ignition3EndTooth = 5; 
+  ignition4EndTooth = 7;
+}
+
+/** @} */

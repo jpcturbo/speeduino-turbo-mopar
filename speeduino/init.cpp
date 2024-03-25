@@ -3685,6 +3685,22 @@ void initialiseTriggers(void)
       attachInterrupt(triggerInterrupt, triggerHandler, primaryTriggerEdge);
       break;
 
+    case DECODER_TURBO_MOPAR:
+      triggerSetup_Turbo_Mopar();
+      triggerHandler = triggerPri_Turbo_Mopar;
+      triggerSecondaryHandler = triggerSec_Turbo_Mopar;  
+      getRPM = getRPM_Turbo_Mopar;
+      getCrankAngle = getCrankAngle_Turbo_Mopar;
+      triggerSetEndTeeth = triggerSetEndTeeth_Turbo_Mopar;
+
+      //TODO JPC add support for inverting REF and SYNC signals via these edge parameters. 
+      //MPSpeeduino LM/SMEC has REF inverted and SYNC normal, MPSpeeduino SBEC has REF inverted and SYNC inverted.
+      //Direct connection to all effect has REF normal and SYNC normal. 
+      primaryTriggerEdge = CHANGE;
+      secondaryTriggerEdge = RISING;  //We only care if the Primary (REF) is high or low when the secondary (SYNC) goes high
+      attachInterrupt(triggerInterrupt, triggerHandler, primaryTriggerEdge);
+      attachInterrupt(triggerInterrupt2, triggerSecondaryHandler, secondaryTriggerEdge);
+      break;
 
     default:
       triggerHandler = triggerPri_missingTooth;
@@ -3693,7 +3709,7 @@ void initialiseTriggers(void)
 
       if(configPage4.TrigEdge == 0) { attachInterrupt(triggerInterrupt, triggerHandler, RISING); } // Attach the crank trigger wheel interrupt (Hall sensor drags to ground when triggering)
       else { attachInterrupt(triggerInterrupt, triggerHandler, FALLING); }
-      break;
+      break;      
   }
 
   #if defined(CORE_TEENSY41)
