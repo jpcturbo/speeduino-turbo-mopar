@@ -1349,7 +1349,7 @@ void initialiseAll(void)
     readTPS(false); // Need to read tps to detect flood clear state
 
     /* tacho sweep function. */
-    //tachoStatus.tachoSweepEnabled = (configPage2.useTachoSweep > 0);
+    currentStatus.tachoSweepEnabled = (configPage2.useTachoSweep > 0);
     /* SweepMax is stored as a byte, RPM/100. divide by 60 to convert min to sec (net 5/3).  Multiply by ignition pulses per rev.
        tachoSweepIncr is also the number of tach pulses per second */
     tachoSweepIncr = configPage2.tachoSweepMaxRPM * maxIgnOutputs * 5 / 3;
@@ -2568,7 +2568,7 @@ void setPinMapping(byte boardID)
         // = PB4;  //(DO NOT USE FOR SPEEDUINO) SPI1_MISO FLASH CHIP
         // = PB5;  //(DO NOT USE FOR SPEEDUINO) SPI1_MOSI FLASH CHIP
         // = PB6;  //NRF_CE
-        // = PB7;  //NRF_CS
+        pinCoil6 = PB7;  //NRF_CS
         // = PB8;  //NRF_IRQ
         pinCoil2 = PB9; //
         // = PB9;  //
@@ -3041,6 +3041,16 @@ void setPinMapping(byte boardID)
       pinMode(pinBat, INPUT);
       pinMode(pinBaro, INPUT);
     #endif
+  #elif defined(CORE_TEENSY41)
+    //Teensy 4.1 has a weak pull down resistor that needs to be disabled for all analog pins. 
+    pinMode(pinMAP, INPUT_DISABLE);
+    pinMode(pinO2, INPUT_DISABLE);
+    pinMode(pinO2_2, INPUT_DISABLE);
+    pinMode(pinTPS, INPUT_DISABLE);
+    pinMode(pinIAT, INPUT_DISABLE);
+    pinMode(pinCLT, INPUT_DISABLE);
+    pinMode(pinBat, INPUT_DISABLE);
+    pinMode(pinBaro, INPUT_DISABLE);
   #endif
 
   //Each of the below are only set when their relevant function is enabled. This can help prevent pin conflicts that users aren't aware of with unused functions
@@ -3384,6 +3394,21 @@ void initialiseTriggers(void)
 
       attachInterrupt(triggerInterrupt, triggerHandler, primaryTriggerEdge);
       attachInterrupt(triggerInterrupt2, triggerSecondaryHandler, secondaryTriggerEdge);
+      break;
+
+    case DECODER_HONDA_J32:
+      triggerSetup_HondaJ32();
+      triggerHandler = triggerPri_HondaJ32;
+      triggerSecondaryHandler = triggerSec_HondaJ32;
+      getRPM = getRPM_HondaJ32;
+      getCrankAngle = getCrankAngle_HondaJ32;
+      triggerSetEndTeeth = triggerSetEndTeeth_HondaJ32;
+
+      primaryTriggerEdge = RISING; // Don't honor the config, always use rising edge 
+      secondaryTriggerEdge = RISING; // Unused
+
+      attachInterrupt(triggerInterrupt, triggerHandler, primaryTriggerEdge);
+      attachInterrupt(triggerInterrupt2, triggerSecondaryHandler, secondaryTriggerEdge);  // Suspect this line is not needed
       break;
 
     case DECODER_MIATA_9905:
