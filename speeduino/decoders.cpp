@@ -6016,21 +6016,22 @@ void triggerSetup_Turbo_Mopar(void)
   BIT_SET(decoderState, BIT_DECODER_TOOTH_ANG_CORRECT);
   BIT_SET(decoderState, BIT_DECODER_HAS_SECONDARY);
 
-  triggerToothAngle = 180; //The number of degrees that passes from tooth to tooth (primary)
+  triggerToothAngle = 90; //The number of degrees that passes from tooth to tooth (primary)
   toothCurrentCount = 11;  //uninitialized state for debugging. 
 
   //Note that these angles are for every rising and falling edge
   //10 edges if we track the window. 
+  //JPC 6/18/2024 I think theeth are just 90 degrees. (88-92 per tooth logger)
   toothAngles[0] = 0;   //Falling edge of tooth #1 - Cyl #1 TDC
-  toothAngles[1] = 97;  //Rising edge of tooth #2
+  toothAngles[1] = 90;  //97//Rising edge of tooth #2
   toothAngles[2] = 180; //Falling edge of tooth #2 - Cyl #3 TDC
-  toothAngles[3] = 277; //Rising edge of tooth #3 
+  toothAngles[3] = 270; //270//Rising edge of tooth #3 
   toothAngles[4] = 360; //Falling edge of tooth #3 - Cyl #4 TDC
-  toothAngles[5] = 457; //Rising edge of tooth #4 (Window)
+  toothAngles[5] = 450; //457//Rising edge of tooth #4 (Window)
   // toothAngles[6] = 489; //Falling edge, window start
   // toothAngles[7] = 508; //Rising edge, window end
   toothAngles[6] = 540; //Falling edge of tooth #4 (Window) - Cyl #2 TDC
-  toothAngles[7] = 637; //Rising edge of tooth #1
+  toothAngles[7] = 630; //637//Rising edge of tooth #1
 
   triggerActualTeeth = 8;  //4 real teeth, both edges. Although with the window there are 5. 3 large and 2 small.
 
@@ -6055,7 +6056,7 @@ void triggerPri_Turbo_Mopar(void){
         currentStatus.hasSync = false;
         currentStatus.syncLossCounter++;
       }      
-      toothCurrentCount = 6;  //6 is half way done by here.
+      toothCurrentCount = 6;  //window tooth is 1/3 way done by here. Remember toothCurrentCount +1 from the toothAngles array.
       currentStatus.hasSync = true;
       revolutionOne = true;  //Cyl #2 and #1 TDC next
       currentStatus.startRevolutions++;  //TODO JPC Is this only supposed to be counted at tooth 1, and then 4 instead??
@@ -6090,17 +6091,17 @@ void triggerPri_Turbo_Mopar(void){
       }
     }
 
-    if (currentStatus.hasSync == true)
-    {
-      if ( (toothCurrentCount == 1) || (toothCurrentCount == 3) || (toothCurrentCount == 5) || (toothCurrentCount == 7)  )
-      {
-        triggerToothAngle = 83;      
-      } 
-      else 
-      {
-        triggerToothAngle = 97;
-      }
-    }     
+    // if (currentStatus.hasSync == true)
+    // {
+    //   if ( (toothCurrentCount == 1) || (toothCurrentCount == 3) || (toothCurrentCount == 5) || (toothCurrentCount == 7)  )
+    //   {
+    //     triggerToothAngle = 83;      
+    //   } 
+    //   else 
+    //   {
+    //     triggerToothAngle = 97;
+    //   }
+    // }     
   } 
 }
 
@@ -6119,7 +6120,7 @@ void triggerSec_Turbo_Mopar(void)
       if(READ_PRI_TRIGGER() == false)
       {
        currentStatus.hasSync = true;  //Pri should have passed tooth 3 by now. 
-       toothCurrentCount = 2;  //2 is ~1/3 of the way in.
+       toothCurrentCount = 2;  //blade 1 is already partly in the Hall sensor.
        revolutionOne = false; //Cyl #3 and #4 TDC next
        currentStatus.startRevolutions++;
       }
