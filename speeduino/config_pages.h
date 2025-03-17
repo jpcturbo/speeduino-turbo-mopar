@@ -993,8 +993,10 @@ struct config15 {
   int8_t rollingProtRPMDelta[4]; // Signed RPM value representing how much below the RPM limit. Divided by 10
   byte rollingProtCutPercent[4];
   
-  //Bytes 106-255
-  byte Unused15_106_255[150];
+  byte fpPumpInv;
+  
+  //Bytes 107-255
+  byte Unused15_107_255[149];
 
 #if defined(CORE_AVR)
   };
