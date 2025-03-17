@@ -62,8 +62,10 @@ void wmiControl(void);
 #define N2O_STAGE1_PIN_HIGH()   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { *n2o_stage1_pin_port |= (n2o_stage1_pin_mask);   }
 #define N2O_STAGE2_PIN_LOW()    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { *n2o_stage2_pin_port &= ~(n2o_stage2_pin_mask);  }
 #define N2O_STAGE2_PIN_HIGH()   ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { *n2o_stage2_pin_port |= (n2o_stage2_pin_mask);   }
-#define FUEL_PUMP_ON()          ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { *pump_pin_port |= (pump_pin_mask);     }
-#define FUEL_PUMP_OFF()         ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { *pump_pin_port &= ~(pump_pin_mask);    }
+#define FUEL_HIGH()             *pump_pin_port |= (pump_pin_mask)
+#define FUEL_LOW()              *pump_pin_port &= ~(pump_pin_mask)
+#define FUEL_PUMP_ON()          ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { ((configPage15.fpPumpInv) ? FUEL_LOW() : FUEL_HIGH()); }
+#define FUEL_PUMP_OFF()         ATOMIC_BLOCK(ATOMIC_RESTORESTATE) { ((configPage15.fpPumpInv) ? FUEL_HIGH() : FUEL_LOW()); }
 
 //Note the below macros cannot use ATOMIC_BLOCK(ATOMIC_RESTORESTATE) as they are called from within ternary operators. The ATOMIC_BLOCK wrapped is instead placed around the ternary call below
 #define FAN_PIN_LOW()           *fan_pin_port &= ~(fan_pin_mask)
