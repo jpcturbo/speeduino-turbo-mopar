@@ -25,10 +25,11 @@
 #ifndef GLOBALS_H
 #define GLOBALS_H
 #include <Arduino.h>
+#include <SimplyAtomic.h>
 #include "table2d.h"
 #include "table3d.h"
-#include <assert.h>
-#include "src/FastCRC/FastCRC.h"
+#include "statuses.h"
+#include "config_pages.h"
 
 #if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega2561__)
   #define BOARD_MAX_DIGITAL_PINS 54 //digital pins +1
@@ -107,13 +108,6 @@
 //This can only be included after the above section
 #include BOARD_H //Note that this is not a real file, it is defined in globals.h. 
 
-//Handy bitsetting macros
-#define BIT_SET(a,b) ((a) |= (1U<<(b)))
-#define BIT_CLEAR(a,b) ((a) &= ~(1U<<(b)))
-#define BIT_CHECK(var,pos) !!((var) & (1U<<(pos)))
-#define BIT_TOGGLE(var,pos) ((var)^= 1UL << (pos))
-#define BIT_WRITE(var, pos, bitvalue) ((bitvalue) ? BIT_SET((var), (pos)) : bitClear((var), (pos)))
-
 #define CRANK_ANGLE_MAX (max(CRANK_ANGLE_MAX_IGN, CRANK_ANGLE_MAX_INJ))
 
 #define interruptSafe(c) (noInterrupts(); {c} interrupts();) //Wraps any code between nointerrupt and interrupt calls
@@ -125,93 +119,22 @@
 #define SERIAL_PORT_PRIMARY   0
 #define SERIAL_PORT_SECONDARY 3
 
-//Define the load algorithm
-#define LOAD_SOURCE_MAP         0
-#define LOAD_SOURCE_TPS         1
-#define LOAD_SOURCE_IMAPEMAP    2
-
-//Define bit positions within engine variable
-#define BIT_ENGINE_RUN      0   // Engine running
-#define BIT_ENGINE_CRANK    1   // Engine cranking
-#define BIT_ENGINE_ASE      2   // after start enrichment (ASE)
-#define BIT_ENGINE_WARMUP   3   // Engine in warmup
-#define BIT_ENGINE_ACC      4   // in acceleration mode (TPS accel)
-#define BIT_ENGINE_DCC      5   // in deceleration mode
-#define BIT_ENGINE_MAPACC   6   // MAP acceleration mode
-#define BIT_ENGINE_MAPDCC   7   // MAP deceleration mode
-
-//Define masks for Status1
-#define BIT_STATUS1_INJ1           0  //inj1
-#define BIT_STATUS1_INJ2           1  //inj2
-#define BIT_STATUS1_INJ3           2  //inj3
-#define BIT_STATUS1_INJ4           3  //inj4
-#define BIT_STATUS1_DFCO           4  //Deceleration fuel cutoff
-#define BIT_STATUS1_BOOSTCUT       5  //Fuel component of MAP based boost cut out
-#define BIT_STATUS1_TOOTHLOG1READY 6  //Used to flag if tooth log 1 is ready
-#define BIT_STATUS1_TOOTHLOG2READY 7  //Used to flag if tooth log 2 is ready (Log is not currently used)
-
-//Define masks for spark variable
-#define BIT_SPARK_HLAUNCH         0  //Hard Launch indicator
-#define BIT_SPARK_SLAUNCH         1  //Soft Launch indicator
-#define BIT_SPARK_HRDLIM          2  //Hard limiter indicator
-#define BIT_SPARK_SFTLIM          3  //Soft limiter indicator
-#define BIT_SPARK_BOOSTCUT        4  //Spark component of MAP based boost cut out
-#define BIT_SPARK_ERROR           5  // Error is detected
-#define BIT_SPARK_IDLE            6  // idle on
-#define BIT_SPARK_SYNC            7  // Whether engine has sync or not
-
-#define BIT_SPARK2_FLATSH         0  //Flat shift hard cut
-#define BIT_SPARK2_FLATSS         1  //Flat shift soft cut
-#define BIT_SPARK2_SPARK2_ACTIVE  2
-#define BIT_SPARK2_UNUSED4        3
-#define BIT_SPARK2_UNUSED5        4
-#define BIT_SPARK2_UNUSED6        5
-#define BIT_SPARK2_UNUSED7        6
-#define BIT_SPARK2_UNUSED8        7
-
 #define BIT_TIMER_1HZ             0
 #define BIT_TIMER_4HZ             1
 #define BIT_TIMER_10HZ            2
 #define BIT_TIMER_15HZ            3
 #define BIT_TIMER_30HZ            4
+#define BIT_TIMER_50HZ            5
 #define BIT_TIMER_200HZ           6
 #define BIT_TIMER_1KHZ            7
 
-#define BIT_STATUS3_RESET_PREVENT 0 //Indicates whether reset prevention is enabled
-#define BIT_STATUS3_NITROUS       1
-#define BIT_STATUS3_FUEL2_ACTIVE  2
-#define BIT_STATUS3_VSS_REFRESH   3
-#define BIT_STATUS3_HALFSYNC      4 //shows if there is only sync from primary trigger, but not from secondary.
-#define BIT_STATUS3_NSQUIRTS1     5
-#define BIT_STATUS3_NSQUIRTS2     6
-#define BIT_STATUS3_NSQUIRTS3     7
-
-#define BIT_STATUS4_WMI_EMPTY     0 //Indicates whether the WMI tank is empty
-#define BIT_STATUS4_VVT1_ERROR    1 //VVT1 cam angle within limits or not
-#define BIT_STATUS4_VVT2_ERROR    2 //VVT2 cam angle within limits or not
-#define BIT_STATUS4_FAN           3 //Fan Status
-#define BIT_STATUS4_BURNPENDING   4
-#define BIT_STATUS4_STAGING_ACTIVE 5
-#define BIT_STATUS4_COMMS_COMPAT  6
-#define BIT_STATUS4_ALLOW_LEGACY_COMMS       7
-
-#define BIT_AIRCON_REQUEST        0 //Indicates whether the A/C button is pressed
-#define BIT_AIRCON_COMPRESSOR     1 //Indicates whether the A/C compressor is running
-#define BIT_AIRCON_RPM_LOCKOUT    2 //Indicates the A/C is locked out due to the RPM being too high/low, or the post-high/post-low-RPM "stand-down" lockout period
-#define BIT_AIRCON_TPS_LOCKOUT    3 //Indicates the A/C is locked out due to high TPS, or the post-high-TPS "stand-down" lockout period
-#define BIT_AIRCON_TURNING_ON     4 //Indicates the A/C request is on (i.e. A/C button pressed), the lockouts are off, however the start delay has not yet elapsed. This gives the idle up time to kick in before the compressor.
-#define BIT_AIRCON_CLT_LOCKOUT    5 //Indicates the A/C is locked out either due to high coolant temp.
-#define BIT_AIRCON_FAN            6 //Indicates whether the A/C fan is running
-#define BIT_AIRCON_UNUSED8        7
-
-#define VALID_MAP_MAX 1022 //The largest ADC value that is valid for the MAP sensor
-#define VALID_MAP_MIN 2 //The smallest ADC value that is valid for the MAP sensor
-
 #ifndef UNIT_TEST 
-#define TOOTH_LOG_SIZE      127
+#define TOOTH_LOG_SIZE      127U
 #else
-#define TOOTH_LOG_SIZE      1
+#define TOOTH_LOG_SIZE      1U
 #endif
+// Some code relies on TOOTH_LOG_SIZE being uint8_t.
+static_assert(TOOTH_LOG_SIZE<UINT8_MAX, "Check all uses of TOOTH_LOG_SIZE");
 
 #define O2_CALIBRATION_PAGE   2U
 #define IAT_CALIBRATION_PAGE  1U
@@ -225,135 +148,8 @@
 #define COMPOSITE_LOG_SYNC 4
 #define COMPOSITE_ENGINE_CYCLE 5
 
-#define EGO_TYPE_OFF      0
-#define EGO_TYPE_NARROW   1
-#define EGO_TYPE_WIDE     2
-
-#define INJ_TYPE_PORT 0
-#define INJ_TYPE_TBODY 1
-
-#define INJ_PAIRED 0
-#define INJ_SEMISEQUENTIAL 1
-#define INJ_BANKED          2
-#define INJ_SEQUENTIAL      3
-
-#define INJ_PAIR_13_24      0
-#define INJ_PAIR_14_23      1
-
 #define OUTPUT_CONTROL_DIRECT   0
 #define OUTPUT_CONTROL_MC33810  10
-
-#define IGN_MODE_WASTED     0U
-#define IGN_MODE_SINGLE     1U
-#define IGN_MODE_WASTEDCOP  2U
-#define IGN_MODE_SEQUENTIAL 3U
-#define IGN_MODE_ROTARY     4U
-
-#define SEC_TRIGGER_SINGLE  0
-#define SEC_TRIGGER_4_1     1
-#define SEC_TRIGGER_POLL    2
-#define SEC_TRIGGER_5_3_2   3
-#define SEC_TRIGGER_TOYOTA_3  4
-
-#define ROTARY_IGN_FC       0
-#define ROTARY_IGN_FD       1
-#define ROTARY_IGN_RX8      2
-
-#define BOOST_MODE_SIMPLE   0
-#define BOOST_MODE_FULL     1
-
-#define EN_BOOST_CONTROL_BARO   0
-#define EN_BOOST_CONTROL_FIXED  1
-
-#define WMI_MODE_SIMPLE       0
-#define WMI_MODE_PROPORTIONAL 1
-#define WMI_MODE_OPENLOOP     2
-#define WMI_MODE_CLOSEDLOOP   3
-
-#define HARD_CUT_FULL       0
-#define HARD_CUT_ROLLING    1
-
-#define EVEN_FIRE           0
-#define ODD_FIRE            1
-
-#define EGO_ALGORITHM_SIMPLE  0
-#define EGO_ALGORITHM_PID     2
-
-#define STAGING_MODE_TABLE  0
-#define STAGING_MODE_AUTO   1
-
-#define NITROUS_OFF         0
-#define NITROUS_STAGE1      1
-#define NITROUS_STAGE2      2
-#define NITROUS_BOTH        3
-
-#define PROTECT_CUT_OFF     0
-#define PROTECT_CUT_IGN     1
-#define PROTECT_CUT_FUEL    2
-#define PROTECT_CUT_BOTH    3
-#define PROTECT_IO_ERROR    7
-
-#define AE_MODE_TPS         0
-#define AE_MODE_MAP         1
-
-#define AE_MODE_MULTIPLIER  0
-#define AE_MODE_ADDER       1
-
-#define KNOCK_MODE_OFF      0
-#define KNOCK_MODE_DIGITAL  1
-#define KNOCK_MODE_ANALOG   2
-
-#define FUEL2_MODE_OFF      0
-#define FUEL2_MODE_MULTIPLY 1
-#define FUEL2_MODE_ADD      2
-#define FUEL2_MODE_CONDITIONAL_SWITCH   3
-#define FUEL2_MODE_INPUT_SWITCH 4
-
-#define SPARK2_MODE_OFF      0
-#define SPARK2_MODE_MULTIPLY 1
-#define SPARK2_MODE_ADD      2
-#define SPARK2_MODE_CONDITIONAL_SWITCH   3
-#define SPARK2_MODE_INPUT_SWITCH 4
-
-#define FUEL2_CONDITION_RPM 0
-#define FUEL2_CONDITION_MAP 1
-#define FUEL2_CONDITION_TPS 2
-#define FUEL2_CONDITION_ETH 3
-
-#define SPARK2_CONDITION_RPM 0
-#define SPARK2_CONDITION_MAP 1
-#define SPARK2_CONDITION_TPS 2
-#define SPARK2_CONDITION_ETH 3
-
-#define RESET_CONTROL_DISABLED             0
-#define RESET_CONTROL_PREVENT_WHEN_RUNNING 1
-#define RESET_CONTROL_PREVENT_ALWAYS       2
-#define RESET_CONTROL_SERIAL_COMMAND       3
-
-#define OPEN_LOOP_BOOST     0
-#define CLOSED_LOOP_BOOST   1
-
-#define SOFT_LIMIT_FIXED        0
-#define SOFT_LIMIT_RELATIVE     1
-
-#define VVT_MODE_ONOFF      0
-#define VVT_MODE_OPEN_LOOP  1
-#define VVT_MODE_CLOSED_LOOP 2
-#define VVT_LOAD_MAP      0
-#define VVT_LOAD_TPS      1
-
-#define MULTIPLY_MAP_MODE_OFF   0
-#define MULTIPLY_MAP_MODE_BARO  1
-#define MULTIPLY_MAP_MODE_100   2
-
-#define FOUR_STROKE         0U
-#define TWO_STROKE          1U
-
-#define GOING_LOW         0
-#define GOING_HIGH        1
-
-#define BATTV_COR_MODE_WHOLE 0
-#define BATTV_COR_MODE_OPENTIME 1
 
 #define INJ1_CMD_BIT      0
 #define INJ2_CMD_BIT      1
@@ -372,13 +168,6 @@
 #define IGN6_CMD_BIT      5
 #define IGN7_CMD_BIT      6
 #define IGN8_CMD_BIT      7
-
-#define ENGINE_PROTECT_BIT_RPM  0
-#define ENGINE_PROTECT_BIT_MAP  1
-#define ENGINE_PROTECT_BIT_OIL  2
-#define ENGINE_PROTECT_BIT_AFR  3
-#define ENGINE_PROTECT_BIT_COOLANT 4
-
 
 #define CALIBRATION_TABLE_SIZE 512 ///< Calibration table size for CLT, IAT, O2
 #define CALIBRATION_TEMPERATURE_OFFSET 40 /**< All temperature measurements are stored offset by 40 degrees.
@@ -406,10 +195,6 @@ This is so we can use an unsigned byte (0-255) to represent temperature ranges f
 #define LOGGER_FILENAMING_DATETIME      1
 #define LOGGER_FILENAMING_SEQENTIAL     2
 
-extern const char TSfirmwareVersion[] PROGMEM;
-
-extern const byte data_structure_version; //This identifies the data structure when reading / writing. Now in use: CURRENT_DATA_VERSION (migration on-the fly) ?
-
 extern struct table3d16RpmLoad fuelTable; //16x16 fuel map
 extern struct table3d16RpmLoad fuelTable2; //16x16 fuel map
 extern struct table3d16RpmLoad ignitionTable; //16x16 ignition map
@@ -422,7 +207,7 @@ extern struct table3d8RpmLoad vvtTable; //8x8 vvt map
 extern struct table3d8RpmLoad vvt2Table; //8x8 vvt map
 extern struct table3d8RpmLoad wmiTable; //8x8 wmi map
 
-typedef table3d6RpmLoad trimTable3d; 
+using trimTable3d = table3d6RpmLoad; 
 
 extern trimTable3d trim1Table; //6x6 Fuel trim 1 map
 extern trimTable3d trim2Table; //6x6 Fuel trim 2 map
@@ -521,7 +306,7 @@ extern byte triggerInterrupt3;
 extern byte fpPrimeTime; //The time (in seconds, based on currentStatus.secl) that the fuel pump started priming
 extern uint8_t softLimitTime; //The time (in 0.1 seconds, based on seclx10) that the soft limiter started
 extern volatile uint16_t mainLoopCount;
-extern unsigned long revolutionTime; //The time in uS that one revolution would take at current speed (The time tooth 1 was last seen, minus the time it was seen prior to that)
+extern uint32_t revolutionTime; //The time in uS that one revolution would take at current speed (The time tooth 1 was last seen, minus the time it was seen prior to that)
 extern volatile unsigned long timer5_overflow_count; //Increments every time counter 5 overflows. Used for the fast version of micros()
 extern volatile unsigned long ms_counter; //A counter that increments once per ms
 extern uint16_t fixedCrankingOverride;
